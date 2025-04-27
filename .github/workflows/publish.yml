@@ -1,0 +1,54 @@
+name: Publish Python Package to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      pkg_name:
+        description: 'Package subdirectory name (under pkg/)'
+        required: true
+        default: 'my_python_pkg'
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+    
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    
+    - name: Verify package directory exists
+      id: verify-pkg
+      run: |
+        PKG_DIR="pkg/${{ inputs.pkg_name }}"
+        if [ ! -d "$PKG_DIR" ]; then
+          echo "::error::Package directory $PKG_DIR not found!"
+          exit 1
+        fi
+        echo "PKG_PATH=$PKG_DIR" >> $GITHUB_OUTPUT
+    
+    - name: Build package
+      run: |
+        cd pkg/${{ inputs.pkg_name }}
+        python setup.py sdist bdist_wheel
+    
+    - name: Check package
+      run: |
+        cd pkg/${{ inputs.pkg_name }}
+        twine check dist/*
+    
+    - name: Publish to PyPI
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        cd pkg/${{ inputs.pkg_name }}
+        twine upload dist/*
